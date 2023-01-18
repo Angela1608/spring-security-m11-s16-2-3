@@ -18,10 +18,7 @@ public class HomeController {
     @GetMapping({"/", "home"})
     public String home(Model model, Authentication auth) {
         MyUserDetails userDetails = (MyUserDetails) auth.getPrincipal();
-        if (!userDetails.getUserAuthority().equals("ADMIN")) {
-            return "redirect:/todos/all/users/" + userDetails.getUserId();
-        }
-        model.addAttribute("users", userService.getAll());
-        return "home";
+        model.addAttribute("user", userService.readById(userDetails.getUserId()));
+        return "redirect:/todos/all/users/" + userDetails.getUserId();
     }
 }
