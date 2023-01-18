@@ -3,12 +3,14 @@
         <div class="container-fluid">
             <div class="navbar-header">
                 <a class="navbar-brand" th:href="@{/}">Home Page</a>
-                <a class="navbar-brand" th:href="@{|~/todos/all/users/${#authentication.principal.userId}|}">
+                <a class="navbar-brand"
+                   sec:authorize="isAuthenticated()"
+                   th:href="@{|~/todos/all/users/${#authentication.principal.userId}|}">
                     My To-Dos</a>
                 <a class="navbar-brand" th:href="@{/users/all}" sec:authorize="hasAuthority('ADMIN')">List of Users</a>
             </div>
 
-            <div class="text-right">
+            <div class="text-right" sec:authorize="isAuthenticated()">
                 <h2 th:inline="text">Hello <a sec:authentication="principal.firstName"
                                               th:href="@{|~/users/${#authentication.principal.userId}/read|}"></a>!
                     <a th:href="@{/perform-logout}" class="btn btn-danger">LogOut</a></h2>

@@ -6,6 +6,11 @@ import com.softserve.itacademy.model.User;
 import com.softserve.itacademy.service.TaskService;
 import com.softserve.itacademy.service.ToDoService;
 import com.softserve.itacademy.service.UserService;
+import com.softserve.itacademy.service.security.MyUserDetails;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -49,8 +54,18 @@ public class ToDoController {
     }
 
     @GetMapping("/{id}/tasks")
-    public String read(@PathVariable long id, Model model) {
+    public String read(@PathVariable long id, Model model, Authentication auth) {
         ToDo todo = todoService.readById(id);
+        MyUserDetails userDetails = (MyUserDetails) auth.getPrincipal();
+        long ownerId = todo.getOwner().getId();
+        List<Long> collaboratorsId = todo.getCollaborators().stream()
+                .map(User::getId).collect(Collectors.toList());
+        List<String> authorities = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toList());
+        long userId = userDetails.getUserId();
+        if (!authorities.contains("ADMIN") && ownerId != userId && !collaboratorsId.contains(userId)) {
+            throw new AccessDeniedException("You cannot read another user's ToDo");
+        }
         List<Task> tasks = taskService.getByTodoId(id);
         List<User> users = userService.getAll().stream()
                 .filter(user -> user.getId() != todo.getOwner().getId()).collect(Collectors.toList());
@@ -61,6 +76,7 @@ public class ToDoController {
     }
 
     @GetMapping("/{todo_id}/update/users/{owner_id}")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER') and #ownerId == authentication.principal.userId")
     public String update(@PathVariable("todo_id") long todoId, @PathVariable("owner_id") long ownerId, Model model) {
         ToDo todo = todoService.readById(todoId);
         model.addAttribute("todo", todo);
@@ -68,6 +84,7 @@ public class ToDoController {
     }
 
     @PostMapping("/{todo_id}/update/users/{owner_id}")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER') and #ownerId == authentication.principal.userId")
     public String update(@PathVariable("todo_id") long todoId, @PathVariable("owner_id") long ownerId,
                          @Validated @ModelAttribute("todo") ToDo todo, BindingResult result) {
         if (result.hasErrors()) {
@@ -82,6 +99,7 @@ public class ToDoController {
     }
 
     @GetMapping("/{todo_id}/delete/users/{owner_id}")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER') and #ownerId == authentication.principal.userId")
     public String delete(@PathVariable("todo_id") long todoId, @PathVariable("owner_id") long ownerId) {
         todoService.delete(todoId);
         return "redirect:/todos/all/users/" + ownerId;
@@ -96,8 +114,15 @@ public class ToDoController {
     }
 
     @GetMapping("/{id}/add")
-    public String addCollaborator(@PathVariable long id, @RequestParam("user_id") long userId) {
+    public String addCollaborator(@PathVariable long id, @RequestParam("user_id") long userId, Authentication auth) {
         ToDo todo = todoService.readById(id);
+        MyUserDetails userDetails = (MyUserDetails) auth.getPrincipal();
+        List<String> authorities = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toList());
+        long ownerId = todo.getOwner().getId();
+        if (!authorities.contains("ADMIN") && ownerId != userDetails.getUserId()) {
+            throw new AccessDeniedException("You cannot add collaborators for another user's ToDo");
+        }
         List<User> collaborators = todo.getCollaborators();
         collaborators.add(userService.readById(userId));
         todo.setCollaborators(collaborators);
@@ -106,8 +131,15 @@ public class ToDoController {
     }
 
     @GetMapping("/{id}/remove")
-    public String removeCollaborator(@PathVariable long id, @RequestParam("user_id") long userId) {
+    public String removeCollaborator(@PathVariable long id, @RequestParam("user_id") long userId, Authentication auth) {
         ToDo todo = todoService.readById(id);
+        MyUserDetails userDetails = (MyUserDetails) auth.getPrincipal();
+        List<String> authorities = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toList());
+        long ownerId = todo.getOwner().getId();
+        if (!authorities.contains("ADMIN") && ownerId != userDetails.getUserId()) {
+            throw new AccessDeniedException("You cannot remove collaborators for another user's ToDo");
+        }
         List<User> collaborators = todo.getCollaborators();
         collaborators.remove(userService.readById(userId));
         todo.setCollaborators(collaborators);
