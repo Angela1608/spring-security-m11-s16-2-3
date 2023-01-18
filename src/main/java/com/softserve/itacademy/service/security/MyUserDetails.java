@@ -19,8 +19,8 @@ public class MyUserDetails implements UserDetails {
         return user.getId();
     }
 
-    public String getUserAuthority() {
-        return user.getRole().getAuthority();
+    public String getFirstName() {
+        return user.getFirstName();
     }
 
     @Override
